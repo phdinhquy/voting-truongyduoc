@@ -1,17 +1,18 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // =======================
 // FIREBASE CONFIG
 // =======================
 const firebaseConfig = {
-  apiKey: "AIzaSyCGZzBXsJA8J2tU9PAlOu0hYhZrOdXd3m8",
-  authDomain: "truongyduoc-minigame-240c1.firebaseapp.com",
-  projectId: "truongyduoc-minigame-240c1",
-  storageBucket: "truongyduoc-minigame-240c1.firebasestorage.app",
-  messagingSenderId: "451497127889",
-  appId: "1:451497127889:web:7aef3bd07c983e327d7af0",
+  apiKey: "AIzaSyDuV04NNLGWammfRN6D9gMvYBDFAX8TiWg",
+  authDomain: "tyd-portal.firebaseapp.com",
+  projectId: "tyd-portal",
+  storageBucket: "tyd-portal.firebasestorage.app",
+  messagingSenderId: "224925324935",
+  appId: "1:224925324935:web:98534d49d4e8433663ca22"
 };
 
 // =======================
@@ -29,3 +30,4 @@ export const provider = new GoogleAuthProvider();
 // DATABASE
 // =======================
 export const db = getFirestore(app);
+export const storage = getStorage(app);
