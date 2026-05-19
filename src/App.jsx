@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+/* ================= ADMIN ================= */
+
 import AdminLogin from "./admin/AdminLogin";
 import AdminLayout from "./admin/AdminLayout";
 import AdminDashboard from "./admin/AdminDashboard";
@@ -9,16 +11,26 @@ import LiveAnalytics from "./admin/LiveAnalytics";
 import AntiCheat from "./admin/AntiCheat";
 import AdminRoute from "./admin/AdminRoute";
 
+/* ================= USER ================= */
+
+import VotePage from "./pages/VotePage";
+
 function App() {
   return (
     <BrowserRouter>
 
       <Routes>
 
-        {/* LOGIN */}
+        {/* ================= USER ================= */}
+
+        <Route path="/" element={<VotePage />} />
+
+        {/* ================= ADMIN LOGIN ================= */}
+
         <Route path="/admin-login" element={<AdminLogin />} />
 
-        {/* PROTECTED ADMIN */}
+        {/* ================= ADMIN PROTECTED ================= */}
+
         <Route
           path="/admin"
           element={
@@ -27,13 +39,11 @@ function App() {
             </AdminRoute>
           }
         >
-
           <Route index element={<AdminDashboard />} />
           <Route path="contest" element={<ContestConfig />} />
           <Route path="posters" element={<PosterManager />} />
           <Route path="live" element={<LiveAnalytics />} />
           <Route path="anticheat" element={<AntiCheat />} />
-
         </Route>
 
       </Routes>

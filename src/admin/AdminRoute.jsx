@@ -1,26 +1,29 @@
+import { Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { auth } from "../firebase/firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { Navigate } from "react-router-dom";
+
+const ADMIN_EMAILS = [
+  "phdinhquy@gmail.com",
+  "ksphdinhquy@gmail.com"
+];
 
 export default function AdminRoute({ children }) {
 
-  const [user, setUser] = useState(undefined);
+  const [user,setUser]=useState(undefined);
 
-  useEffect(() => {
+  useEffect(()=>{
 
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = auth.onAuthStateChanged(u=>{
       setUser(u);
     });
 
-    return () => unsub();
+    return ()=>unsub();
 
-  }, []);
+  },[]);
 
-  if (user === undefined)
-    return <h3>Loading...</h3>;
+  if(user===undefined) return <div>Loading...</div>;
 
-  if (!user)
+  if(!user || !ADMIN_EMAILS.includes(user.email))
     return <Navigate to="/admin-login" />;
 
   return children;
