@@ -2,6 +2,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   OAuthProvider,
+  FacebookAuthProvider, // ⭐ NEW
   signOut
 } from "firebase/auth";
 
@@ -10,14 +11,16 @@ import Swal from "sweetalert2";
 
 const google = new GoogleAuthProvider();
 const microsoft = new OAuthProvider("microsoft.com");
+const facebook = new FacebookAuthProvider(); // ⭐ NEW
 
+/* ================= GOOGLE ================= */
 export const loginGoogle = async () => {
   try {
     const res = await signInWithPopup(auth, google);
 
     Swal.fire({
       icon: "success",
-      title: "Đăng nhập thành công"
+      title: "Đăng nhập Google thành công"
     });
 
     return res.user;
@@ -26,6 +29,7 @@ export const loginGoogle = async () => {
   }
 };
 
+/* ================= MICROSOFT ================= */
 export const loginMicrosoft = async () => {
   try {
     const res = await signInWithPopup(auth, microsoft);
@@ -52,4 +56,21 @@ export const loginMicrosoft = async () => {
   }
 };
 
+/* ================= FACEBOOK ⭐ NEW ================= */
+export const loginFacebook = async () => {
+  try {
+    const res = await signInWithPopup(auth, facebook);
+
+    Swal.fire({
+      icon: "success",
+      title: "Đăng nhập Facebook thành công"
+    });
+
+    return res.user;
+  } catch (e) {
+    Swal.fire("Login Facebook lỗi", e.message, "error");
+  }
+};
+
+/* ================= LOGOUT ================= */
 export const logoutUser = () => signOut(auth);
