@@ -304,7 +304,7 @@ export default function VotePage() {
           <b>Có</b> {posters.length} poster
         </div>
         <div>
-          Quy định: 1 người vote 1 lần, chọn nhiều poster
+          Quy định: 1 người vote 1 lần, được phép chọn nhiều poster.
         </div>
       </div>
 
@@ -316,8 +316,25 @@ export default function VotePage() {
         <div>
           {contest?.startTime && contest?.endTime && (
             <>
-              {new Date(contest.startTime.toDate()).toLocaleString()} →{" "}
-              {new Date(contest.endTime.toDate()).toLocaleString()}
+              {new Date(contest.startTime.toDate()).toLocaleString("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false
+})}
+→
+{new Date(contest.endTime.toDate()).toLocaleString("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false
+})}
             </>
           )}
         </div>
