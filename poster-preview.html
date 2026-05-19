@@ -1,0 +1,7 @@
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("posterId");
+
+  // redirect về app chính
+  window.location.href = "https://voting-truongyduoc.vercel.app/?posterId=" + id;
+</script>

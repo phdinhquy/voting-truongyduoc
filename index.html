@@ -1,13 +1,38 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>truongyduoc-minigame</title>
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="UD-SMP Poster Voting" />
+
+    <meta property="og:title" content="Poster Voting - UD SMP" />
+    <meta property="og:description" content="Bình chọn poster nghiên cứu khoa học UD-SMP" />
+
+    <!-- LOGO HIỂN THỊ FACEBOOK -->
+    <meta property="og:image" content="https://voting-truongyduoc.vercel.app/logo.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="UD-SMP Poster Voting Logo" />
+
+    <meta property="og:url" content="https://voting-truongyduoc.vercel.app/" />
+
+    <!-- optional nhưng nên có -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://voting-truongyduoc.vercel.app/logo.png" />
+    <title>Vote-Poster-UD-SMP</title>
   </head>
+
   <body>
+    <!-- Facebook SDK MUST be here -->
+    <div id="fb-root"></div>
+
+    <script async defer crossorigin="anonymous"
+      src="https://connect.facebook.net/vi_VN/sdk.js#xfbml=1&version=v19.0">
+    </script>
+
     <div id="root"></div>
+
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
