@@ -333,14 +333,14 @@ export default function VotePage() {
               : nowAllowed
                 ? "Đang mở vote"
                 : "Ngoài thời gian vote"
-            : "Chưa đăng nhập"}
+            : "Chưa đăng nhập. Để được bình chọn, hãy đăng nhập."}
         </div>
 
         <div className="d-flex gap-2">
           {!user ? (
             <>
-              <button className="btn btn-danger" onClick={loginGoogle}>Google</button>
-              <button className="btn btn-primary" onClick={loginMicrosoft}>Microsoft</button>
+              <button className="btn btn-danger" onClick={loginGoogle}>Tài khoản Google</button>
+              <button className="btn btn-primary" onClick={loginMicrosoft}>Tài khoản Microsoft 365 của UD-SMP</button>
             </>
           ) : (
             <>
