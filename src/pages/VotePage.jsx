@@ -966,7 +966,7 @@ useEffect(() => {
     onClick={loginGoogle}
   >
     <i className="bi bi-google"></i>
-    <span>Continue with Google</span>
+    <span>Đăng nhập với Google</span>
   </button>
 
   <button
@@ -974,7 +974,7 @@ useEffect(() => {
     onClick={loginMicrosoft}
   >
     <i className="bi bi-microsoft"></i>
-    <span>Continue with Microsoft 365</span>
+    <span>Đăng nhập với Microsoft 365</span>
   </button>
 
   <div className="divider">
