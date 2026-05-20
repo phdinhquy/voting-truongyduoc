@@ -877,7 +877,7 @@ export default function VotePage() {
 			setPreviewPoster(p);
 		}}
 	>
-		👁 Xem chi tiết
+		👁 Chi tiết
 	</button>
 
 	<button
@@ -888,7 +888,7 @@ export default function VotePage() {
 			shareFacebook(p);
 		}}
 	>
-		📤 Share
+		📤 Chia sẻ
 	</button>
 </div>
 									</div>
