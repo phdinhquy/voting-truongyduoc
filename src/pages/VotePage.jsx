@@ -755,7 +755,7 @@ export default function VotePage() {
 						const selected = selectedPosters.includes(p.id);
 
 						return (
-							<div key={p.id} className="col-xl-3 col-lg-4 col-md-6">
+							<div key={p.id} className="col-xl-4 col-lg-4 col-md-6">
 								<div
 									className={`card h-100 shadow-sm border-0 position-relative ${
 										selected ? "border-success" : ""
