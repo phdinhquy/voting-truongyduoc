@@ -1,4 +1,3 @@
-
 // FULL VotePage.jsx
 // COMPLETE VERSION
 // LOGIN + GUEST VOTING
@@ -11,24 +10,24 @@ import { db, auth } from "../firebase/firebase";
 import "../styles/vote.css";
 
 import {
-  collection,
-  onSnapshot,
-  addDoc,
-  query,
-  where,
-  getDocs,
-  doc,
-  updateDoc,
-  increment,
-  serverTimestamp,
-  setDoc,
-  getDoc
+	collection,
+	onSnapshot,
+	addDoc,
+	query,
+	where,
+	getDocs,
+	doc,
+	updateDoc,
+	increment,
+	serverTimestamp,
+	setDoc,
+	getDoc,
 } from "firebase/firestore";
 
 import {
-  loginGoogle,
-  loginMicrosoft,
-  logoutUser
+	loginGoogle,
+	loginMicrosoft,
+	logoutUser,
 } from "../services/userAuthService";
 
 import Swal from "sweetalert2";
@@ -36,1405 +35,971 @@ import Swal from "sweetalert2";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
 
 export default function VotePage() {
+	/* ====================================================== */
+	/* ======================= STATE ========================= */
+	/* ====================================================== */
+	const [previewPoster, setPreviewPoster] = useState(null);
 
-  /* ====================================================== */
-  /* ======================= STATE ========================= */
-  /* ====================================================== */
+	const [user, setUser] = useState(null);
 
-  const [user, setUser] = useState(null);
+	const [contest, setContest] = useState(null);
 
-  const [contest, setContest] = useState(null);
+	const [posters, setPosters] = useState([]);
 
-  const [posters, setPosters] = useState([]);
+	const [selectedPosters, setSelectedPosters] = useState([]);
 
-  const [selectedPosters, setSelectedPosters] = useState([]);
+	const [hasVoted, setHasVoted] = useState(false);
 
-  const [hasVoted, setHasVoted] = useState(false);
+	const [submitting, setSubmitting] = useState(false);
 
-  const [submitting, setSubmitting] = useState(false);
+	const [search, setSearch] = useState("");
 
-  const [search, setSearch] = useState("");
+	/* ================= GUEST ================= */
 
-  /* ================= GUEST ================= */
+	const [guestMode, setGuestMode] = useState(false);
 
-  const [guestMode, setGuestMode] = useState(false);
+	const [deviceId, setDeviceId] = useState(null);
 
-  const [deviceId, setDeviceId] = useState(null);
+	const [guestVoted, setGuestVoted] = useState(false);
 
-  const [guestVoted, setGuestVoted] = useState(false);
+	const [guestVoteInfo, setGuestVoteInfo] = useState(null);
 
-  const [guestVoteInfo, setGuestVoteInfo] = useState(null);
+	/* ================= STATUS ================= */
 
-  /* ================= STATUS ================= */
+	const [nowAllowed, setNowAllowed] = useState(false);
 
-  const [nowAllowed, setNowAllowed] = useState(false);
+	const [voteStatusText, setVoteStatusText] = useState("");
 
-  const [voteStatusText, setVoteStatusText] = useState("");
+	/* ====================================================== */
+	/* ======================== AUTH ========================= */
+	/* ====================================================== */
 
-  /* ====================================================== */
-  /* ======================== AUTH ========================= */
-  /* ====================================================== */
+	useEffect(() => {
+		return auth.onAuthStateChanged((u) => {
+			setUser(u);
+		});
+	}, []);
 
-  useEffect(() => {
+	/* ====================================================== */
+	/* ====================== CONTEST ======================== */
+	/* ====================================================== */
 
-    return auth.onAuthStateChanged((u) => {
+	useEffect(() => {
+		return onSnapshot(
+			doc(db, "config", "contest"),
 
-      setUser(u);
+			(snap) => {
+				setContest(snap.data());
+			}
+		);
+	}, []);
 
-    });
+	/* ====================================================== */
+	/* ====================== POSTERS ======================== */
+	/* ====================================================== */
 
-  }, []);
+	useEffect(() => {
+		return onSnapshot(
+			collection(db, "posters"),
 
-  /* ====================================================== */
-  /* ====================== CONTEST ======================== */
-  /* ====================================================== */
+			(snap) => {
+				setPosters(
+					snap.docs.map((d) => ({
+						id: d.id,
 
-  useEffect(() => {
+						...d.data(),
+					}))
+				);
+			}
+		);
+	}, []);
 
-    return onSnapshot(
+	/* ====================================================== */
+	/* ================== LOAD LOGIN VOTE ==================== */
+	/* ====================================================== */
 
-      doc(db, "config", "contest"),
+	useEffect(() => {
+		if (!user) return;
 
-      (snap) => {
+		const q = query(
+			collection(db, "votes"),
 
-        setContest(snap.data());
+			where("uid", "==", user.uid)
+		);
 
-      }
+		getDocs(q).then((snap) => {
+			const votedIds = snap.docs.map((d) => d.data().posterId);
 
-    );
+			setSelectedPosters(votedIds);
 
-  }, []);
+			setHasVoted(votedIds.length > 0);
+		});
+	}, [user]);
 
-  /* ====================================================== */
-  /* ====================== POSTERS ======================== */
-  /* ====================================================== */
+	/* ====================================================== */
+	/* ======================= RESET ========================= */
+	/* ====================================================== */
 
-  useEffect(() => {
+	useEffect(() => {
+		if (!user) {
+			setSelectedPosters([]);
 
-    return onSnapshot(
+			setHasVoted(false);
+		}
+	}, [user]);
 
-      collection(db, "posters"),
+	/* ====================================================== */
+	/* ===================== TIME CHECK ====================== */
+	/* ====================================================== */
 
-      (snap) => {
+	useEffect(() => {
+		if (!contest) return;
 
-        setPosters(
+		const now = Date.now();
 
-          snap.docs.map((d) => ({
+		const start = contest.startTime?.toDate?.().getTime?.() || 0;
 
-            id: d.id,
+		const end = contest.endTime?.toDate?.().getTime?.() || 0;
 
-            ...d.data()
+		if (!contest.isActive) {
+			setNowAllowed(false);
 
-          }))
+			setVoteStatusText("⛔ Cuộc thi chưa kích hoạt");
 
-        );
+			return;
+		}
 
-      }
+		if (now < start) {
+			setNowAllowed(false);
 
-    );
+			setVoteStatusText("⏳ Chưa đến thời gian bình chọn");
 
-  }, []);
+			return;
+		}
 
-  /* ====================================================== */
-  /* ================== LOAD LOGIN VOTE ==================== */
-  /* ====================================================== */
+		if (now > end) {
+			setNowAllowed(false);
 
-  useEffect(() => {
+			setVoteStatusText("⛔ Đã kết thúc bình chọn");
 
-    if (!user) return;
+			return;
+		}
 
-    const q = query(
+		setNowAllowed(true);
 
-      collection(db, "votes"),
+		setVoteStatusText("🟢 Đang trong thời gian bình chọn");
+	}, [contest]);
 
-      where("uid", "==", user.uid)
+	/* ====================================================== */
+	/* ===================== USER TYPE ======================= */
+	/* ====================================================== */
 
-    );
+	const getUserType = () => {
+		if (!user?.email) return "guest";
 
-    getDocs(q).then((snap) => {
+		if (
+			user.email.endsWith("@smp.und.vn") ||
+			user.email.endsWith("@st.smp.udn.vn")
+		) {
+			return "internal";
+		}
 
-      const votedIds = snap.docs.map(
+		return "guest";
+	};
 
-        (d) => d.data().posterId
+	/* ====================================================== */
+	/* ===================== MAX VOTE ======================== */
+	/* ====================================================== */
 
-      );
+	const getMaxVote = () => {
+		if (!contest) return 0;
 
-      setSelectedPosters(votedIds);
+		if (guestMode) {
+			return contest.maxVoteGuest || 11;
+		}
 
-      setHasVoted(votedIds.length > 0);
+		return getUserType() === "internal"
+			? contest.maxVoteInternal
+			: contest.maxVoteGuest;
+	};
 
-    });
+	/* ====================================================== */
+	/* ==================== GUEST LOGIN ====================== */
+	/* ====================================================== */
 
-  }, [user]);
+	const continueAsGuest = async () => {
+		try {
+			setGuestMode(true);
 
-  /* ====================================================== */
-  /* ======================= RESET ========================= */
-  /* ====================================================== */
+			// CHỜ REACT RENDER
+			await new Promise((resolve) => setTimeout(resolve, 50));
 
-  useEffect(() => {
+			const fp = await FingerprintJS.load();
 
-    if (!user) {
+			const result = await fp.get();
 
-      setSelectedPosters([]);
+			const visitorId = result.visitorId;
 
-      setHasVoted(false);
+			setDeviceId(visitorId);
 
-    }
+			localStorage.setItem("guest_device_id", visitorId);
 
-  }, [user]);
+			const guestRef = doc(db, "guest_votes", visitorId);
 
-  /* ====================================================== */
-  /* ===================== TIME CHECK ====================== */
-  /* ====================================================== */
+			const guestSnap = await getDoc(guestRef);
 
-  useEffect(() => {
+			if (guestSnap.exists()) {
+				const data = guestSnap.data();
 
-    if (!contest) return;
+				setGuestVoted(true);
 
-    const now = Date.now();
+				const votedTime = data.createdAt?.toDate?.();
 
-    const start =
-      contest.startTime?.toDate?.().getTime?.() || 0;
-
-    const end =
-      contest.endTime?.toDate?.().getTime?.() || 0;
-
-    if (!contest.isActive) {
-
-      setNowAllowed(false);
-
-      setVoteStatusText(
-        "⛔ Cuộc thi chưa kích hoạt"
-      );
-
-      return;
-    }
-
-    if (now < start) {
-
-      setNowAllowed(false);
-
-      setVoteStatusText(
-        "⏳ Chưa đến thời gian bình chọn"
-      );
-
-      return;
-    }
-
-    if (now > end) {
-
-      setNowAllowed(false);
-
-      setVoteStatusText(
-        "⛔ Đã kết thúc bình chọn"
-      );
-
-      return;
-    }
-
-    setNowAllowed(true);
-
-    setVoteStatusText(
-      "🟢 Đang trong thời gian bình chọn"
-    );
-
-  }, [contest]);
-
-  /* ====================================================== */
-  /* ===================== USER TYPE ======================= */
-  /* ====================================================== */
-
-  const getUserType = () => {
-
-    if (!user?.email) return "guest";
-
-    if (
-
-      user.email.endsWith("@smp.und.vn") ||
-
-      user.email.endsWith("@st.smp.udn.vn")
-
-    ) {
-
-      return "internal";
-
-    }
-
-    return "guest";
-  };
-
-  /* ====================================================== */
-  /* ===================== MAX VOTE ======================== */
-  /* ====================================================== */
-
-  const getMaxVote = () => {
-
-    if (!contest) return 0;
-
-    if (guestMode) {
-
-      return contest.maxVoteGuest || 11;
-
-    }
-
-    return getUserType() === "internal"
-
-      ? contest.maxVoteInternal
-
-      : contest.maxVoteGuest;
-  };
-
-  /* ====================================================== */
-  /* ==================== GUEST LOGIN ====================== */
-  /* ====================================================== */
-
-const continueAsGuest = async () => {
-
-  try {
-
-    setGuestMode(true);
-
-    // CHỜ REACT RENDER
-    await new Promise(resolve =>
-      setTimeout(resolve, 50)
-    );
-
-    const fp = await FingerprintJS.load();
-
-    const result = await fp.get();
-
-    const visitorId = result.visitorId;
-
-    setDeviceId(visitorId);
-
-    localStorage.setItem(
-      "guest_device_id",
-      visitorId
-    );
-
-    const guestRef = doc(
-      db,
-      "guest_votes",
-      visitorId
-    );
-
-    const guestSnap = await getDoc(guestRef);
-
-    if (guestSnap.exists()) {
-
-      const data = guestSnap.data();
-
-      setGuestVoted(true);
-
-      const votedTime =
-        data.createdAt?.toDate?.();
-
-      Swal.fire({
-        icon: "info",
-        title: "Bạn đã bình chọn",
-        html: `
+				Swal.fire({
+					icon: "info",
+					title: "Bạn đã bình chọn",
+					html: `
           Thiết bị này đã bình chọn vào:<br/><br/>
           <b>
-            ${
-              votedTime
-                ? votedTime.toLocaleString("vi-VN")
-                : "Không xác định"
-            }
+            ${votedTime ? votedTime.toLocaleString("vi-VN") : "Không xác định"}
           </b>
-        `
-      });
+        `,
+				});
 
-      return;
-    }
+				return;
+			}
 
-    Swal.fire({
-      icon: "success",
-      title: "Guest Voting",
-      text:
-        "Bạn đang bình chọn với tư cách khách"
-    });
+			Swal.fire({
+				icon: "success",
+				title: "Guest Voting",
+				text: "Bạn đang bình chọn với tư cách khách",
+			});
+		} catch (e) {
+			setGuestMode(false);
 
-  } catch (e) {
+			Swal.fire({
+				icon: "error",
+				title: "Guest Error",
+				text: e.message,
+			});
+		}
+	};
 
-    setGuestMode(false);
+	/* ====================================================== */
+	/* ======================== TOGGLE ======================= */
+	/* ====================================================== */
 
-    Swal.fire({
-      icon: "error",
-      title: "Guest Error",
-      text: e.message
-    });
+	const togglePoster = (poster) => {
+		if (
+			(!user && !guestMode) ||
+			hasVoted ||
+			guestVoted ||
+			submitting ||
+			!nowAllowed
+		) {
+			return;
+		}
 
-  }
-};
+		const exists = selectedPosters.includes(poster.id);
 
-  /* ====================================================== */
-  /* ======================== TOGGLE ======================= */
-  /* ====================================================== */
+		if (exists) {
+			setSelectedPosters((prev) => prev.filter((id) => id !== poster.id));
 
-  const togglePoster = (poster) => {
+			return;
+		}
 
-    if (
+		if (selectedPosters.length >= getMaxVote()) {
+			Swal.fire(`Chỉ được chọn tối đa ${getMaxVote()} poster`);
 
-      (!user && !guestMode) ||
+			return;
+		}
 
-      hasVoted ||
+		setSelectedPosters((prev) => [...prev, poster.id]);
+	};
 
-      guestVoted ||
+	/* ====================================================== */
+	/* ===================== SUBMIT VOTE ===================== */
+	/* ====================================================== */
 
-      submitting ||
+	const submitVote = async () => {
+		if (!user && !guestMode) {
+			return Swal.fire({
+				icon: "warning",
 
-      !nowAllowed
+				title: "Chưa xác nhận hình thức vote",
 
-    ) {
+				text: "Vui lòng đăng nhập hoặc chọn Khách",
+			});
+		}
 
-      return;
-    }
+		if (!nowAllowed) {
+			return Swal.fire("Ngoài thời gian bình chọn");
+		}
 
-    const exists =
-      selectedPosters.includes(poster.id);
+		if (selectedPosters.length === 0) {
+			return Swal.fire("Bạn chưa chọn poster");
+		}
 
-    if (exists) {
+		if (submitting) return;
 
-      setSelectedPosters((prev) =>
+		const confirm = await Swal.fire({
+			title: "Xác nhận bình chọn?",
 
-        prev.filter((id) => id !== poster.id)
+			html: `Bạn đã chọn <b>${selectedPosters.length}</b> poster`,
 
-      );
+			icon: "question",
 
-      return;
-    }
+			showCancelButton: true,
 
-    if (
+			confirmButtonText: "Xác nhận",
+		});
 
-      selectedPosters.length >= getMaxVote()
+		if (!confirm.isConfirmed) return;
 
-    ) {
+		setSubmitting(true);
 
-      Swal.fire(
+		try {
+			/* ====================================================== */
+			/* ====================== GUEST ========================== */
+			/* ====================================================== */
 
-        `Chỉ được chọn tối đa ${getMaxVote()} poster`
+			if (guestMode) {
+				const guestRef = doc(
+					db,
 
-      );
+					"guest_votes",
 
-      return;
-    }
+					deviceId
+				);
 
-    setSelectedPosters((prev) => [
+				const existed = await getDoc(guestRef);
 
-      ...prev,
+				if (existed.exists()) {
+					const data = existed.data();
 
-      poster.id
+					Swal.fire({
+						icon: "info",
 
-    ]);
-  };
+						title: "Thiết bị đã vote",
 
-  /* ====================================================== */
-  /* ===================== SUBMIT VOTE ===================== */
-  /* ====================================================== */
-
-  const submitVote = async () => {
-
-    if (!user && !guestMode) {
-
-      return Swal.fire({
-
-        icon: "warning",
-
-        title: "Chưa xác nhận hình thức vote",
-
-        text:
-          "Vui lòng đăng nhập hoặc chọn Khách"
-
-      });
-    }
-
-    if (!nowAllowed) {
-
-      return Swal.fire(
-
-        "Ngoài thời gian bình chọn"
-
-      );
-    }
-
-    if (selectedPosters.length === 0) {
-
-      return Swal.fire(
-
-        "Bạn chưa chọn poster"
-
-      );
-    }
-
-    if (submitting) return;
-
-    const confirm = await Swal.fire({
-
-      title: "Xác nhận bình chọn?",
-
-      html:
-        `Bạn đã chọn <b>${selectedPosters.length}</b> poster`,
-
-      icon: "question",
-
-      showCancelButton: true,
-
-      confirmButtonText: "Xác nhận"
-
-    });
-
-    if (!confirm.isConfirmed) return;
-
-    setSubmitting(true);
-
-    try {
-
-      /* ====================================================== */
-      /* ====================== GUEST ========================== */
-      /* ====================================================== */
-
-      if (guestMode) {
-
-        const guestRef = doc(
-
-          db,
-
-          "guest_votes",
-
-          deviceId
-
-        );
-
-        const existed = await getDoc(
-
-          guestRef
-
-        );
-
-        if (existed.exists()) {
-
-          const data = existed.data();
-
-          Swal.fire({
-
-            icon: "info",
-
-            title: "Thiết bị đã vote",
-
-            html: `
+						html: `
               Thiết bị này đã vote vào:<br/><br/>
               <b>
-                ${
-                  data.createdAt
-                    ?.toDate?.()
-                    ?.toLocaleString("vi-VN")
-                }
+                ${data.createdAt?.toDate?.()?.toLocaleString("vi-VN")}
               </b>
-            `
+            `,
+					});
 
-          });
+					setGuestVoted(true);
 
-          setGuestVoted(true);
+					setSubmitting(false);
 
-          setSubmitting(false);
+					return;
+				}
 
-          return;
-        }
+				for (const posterId of selectedPosters) {
+					await updateDoc(
+						doc(db, "posters", posterId),
 
-        for (const posterId of selectedPosters) {
+						{
+							guestVoteCount: increment(1),
+						}
+					);
+				}
 
-          await updateDoc(
+				await setDoc(guestRef, {
+					deviceId,
 
-            doc(db, "posters", posterId),
+					posterIds: selectedPosters,
 
-            {
+					createdAt: serverTimestamp(),
 
-              guestVoteCount: increment(1)
+					deviceInfo: {
+						userAgent: navigator.userAgent,
 
-            }
+						platform: navigator.platform,
 
-          );
+						language: navigator.language,
+					},
+				});
 
-        }
+				localStorage.setItem(
+					"guest_voted",
 
-        await setDoc(guestRef, {
+					"true"
+				);
 
-          deviceId,
+				setGuestVoted(true);
 
-          posterIds: selectedPosters,
+				setSelectedPosters([]);
 
-          createdAt: serverTimestamp(),
+				Swal.fire({
+					icon: "success",
 
-          deviceInfo: {
+					title: "Vote thành công 🎉",
 
-            userAgent: navigator.userAgent,
+					text: "Cảm ơn bạn đã tham gia bình chọn",
+				});
 
-            platform: navigator.platform,
+				setSubmitting(false);
 
-            language: navigator.language
+				return;
+			}
 
-          }
+			/* ====================================================== */
+			/* ====================== LOGIN ========================== */
+			/* ====================================================== */
 
-        });
+			for (const posterId of selectedPosters) {
+				await addDoc(
+					collection(db, "votes"),
 
-        localStorage.setItem(
+					{
+						uid: user.uid,
 
-          "guest_voted",
+						email: user.email,
 
-          "true"
+						posterId,
 
-        );
+						createdAt: serverTimestamp(),
+					}
+				);
 
-        setGuestVoted(true);
+				await updateDoc(
+					doc(db, "posters", posterId),
 
-        setSelectedPosters([]);
+					{
+						voteCount: increment(1),
+					}
+				);
+			}
 
-        Swal.fire({
+			Swal.fire(
+				"Vote thành công 🎉",
 
-          icon: "success",
+				"",
 
-          title: "Vote thành công 🎉",
+				"success"
+			);
 
-          text:
-            "Cảm ơn bạn đã tham gia bình chọn"
+			setHasVoted(true);
 
-        });
+			setSelectedPosters([]);
+		} catch (e) {
+			Swal.fire({
+				icon: "error",
 
-        setSubmitting(false);
+				title: "Vote lỗi",
 
-        return;
-      }
+				text: e.message,
+			});
+		}
 
-      /* ====================================================== */
-      /* ====================== LOGIN ========================== */
-      /* ====================================================== */
+		setSubmitting(false);
+	};
 
-      for (const posterId of selectedPosters) {
+	/* ====================================================== */
+	/* ====================== FACEBOOK ======================= */
+	/* ====================================================== */
 
-        await addDoc(
+	const shareFacebook = (poster) => {
+		const baseUrl = "https://voting-truongyduoc.vercel.app";
+
+		const url = `${baseUrl}/poster/${poster.id}`;
 
-          collection(db, "votes"),
+		window.open(
+			"https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(url),
+
+			"_blank",
 
-          {
+			"width=600,height=500"
+		);
+	};
 
-            uid: user.uid,
+	/* ====================================================== */
+	/* ======================= FILTER ======================== */
+	/* ====================================================== */
+
+	const filteredPosters = posters.filter(
+		(p) =>
+			(p.title || "")
 
-            email: user.email,
-
-            posterId,
-
-            createdAt: serverTimestamp()
-
-          }
-
-        );
-
-        await updateDoc(
-
-          doc(db, "posters", posterId),
-
-          {
-
-            voteCount: increment(1)
-
-          }
-
-        );
-
-      }
-
-      Swal.fire(
-
-        "Vote thành công 🎉",
-
-        "",
-
-        "success"
-
-      );
-
-      setHasVoted(true);
-
-      setSelectedPosters([]);
-
-    } catch (e) {
-
-      Swal.fire({
-
-        icon: "error",
-
-        title: "Vote lỗi",
-
-        text: e.message
-
-      });
-
-    }
-
-    setSubmitting(false);
-  };
-
-  /* ====================================================== */
-  /* ====================== FACEBOOK ======================= */
-  /* ====================================================== */
-
-  const shareFacebook = (poster) => {
-
-    const baseUrl =
-      "https://voting-truongyduoc.vercel.app";
-
-    const url =
-      `${baseUrl}/poster/${poster.id}`;
-
-    window.open(
-
-      "https://www.facebook.com/sharer/sharer.php?u=" +
-
-      encodeURIComponent(url),
-
-      "_blank",
-
-      "width=600,height=500"
-
-    );
-  };
-
-  /* ====================================================== */
-  /* ======================= FILTER ======================== */
-  /* ====================================================== */
-
-  const filteredPosters = posters.filter(
-
-    (p) =>
-
-      (p.title || "")
-
-        .toLowerCase()
-
-        .includes(search.toLowerCase()) ||
-
-      (p.author || "")
-
-        .toLowerCase()
-
-        .includes(search.toLowerCase())
-
-  );
-
-  /* ====================================================== */
-  /* ====================== SECURITY ======================= */
-  /* ====================================================== */
-
-  useEffect(() => {
-
-    const blockKeys = (e) => {
-
-      if (e.key === "F12") {
-
-        e.preventDefault();
-
-      }
-
-      if (
-
-        (
-
-          e.ctrlKey &&
-
-          e.shiftKey &&
-
-          ["I", "J", "C"].includes(e.key)
-
-        ) ||
-
-        (e.ctrlKey && e.key === "U")
-
-      ) {
-
-        e.preventDefault();
-
-      }
-
-    };
-
-    window.addEventListener(
-
-      "keydown",
-
-      blockKeys
-
-    );
-
-    return () => {
-
-      window.removeEventListener(
-
-        "keydown",
-
-        blockKeys
-
-      );
-
-    };
-
-  }, []);
-
-  useEffect(() => {
-
-    const blockContext = (e) =>
-      e.preventDefault();
-
-    document.addEventListener(
-
-      "contextmenu",
-
-      blockContext
-
-    );
-
-    return () => {
-
-      document.removeEventListener(
-
-        "contextmenu",
-
-        blockContext
-
-      );
-
-    };
-
-  }, []);
-
-  /* ====================================================== */
-  /* ========================== UI ========================= */
-  /* ====================================================== */
-useEffect(() => {
-
-  console.log("guestMode:", guestMode);
-
-}, [guestMode]);
-  return (
-
-    <div className="container-fluid bg-light min-vh-100 py-4">
-
-      {/* ====================================================== */}
-      {/* ======================== HEADER ======================= */}
-      {/* ====================================================== */}
-
-      <div className="container mb-4">
-
-        <div className="card shadow-sm border-0">
-
-          <div className="card-body">
-
-            <div className="d-flex align-items-center gap-3 mb-3">
-
-              <img
-
-                src="/logo.png"
-
-                style={{
-
-                  width: 52,
-
-                  height: 52
-
-                }}
-
-              />
-
-              <div>
-
-                <div className="text-muted small">
-
-                  <h5>
-                    TRƯỜNG Y DƯỢC - ĐẠI HỌC ĐÀ NẴNG
-                  </h5>
-
-                </div>
-
-                <h6 className="fw-bold mb-0 text-primary">
-
-                  {
-
-                    contest?.title ||
-
-                    "Poster Voting System"
-
-                  }
-
-                </h6>
-
-              </div>
-
-            </div>
-
-            {/* ================= STATUS ================= */}
-
-            <div className="alert alert-info d-flex justify-content-between mb-3">
-
-              <div>
-
-                🕒 {voteStatusText}
-
-              </div>
-
-              <div>
-
-                {
-
-                  contest?.startTime &&
-
-                  contest?.endTime && (
-
-                    <>
-
-                      {
-
-                        new Date(
-
-                          contest.startTime.toDate()
-
-                        ).toLocaleString("vi-VN")
-
-                      }
-
-                      →
-
-                      {
-
-                        new Date(
-
-                          contest.endTime.toDate()
-
-                        ).toLocaleString("vi-VN")
-
-                      }
-
-                    </>
-
-                  )
-
-                }
-
-              </div>
-
-            </div>
-
-            {/* ================= LOGIN AREA ================= */}
-
-            <div className="d-flex justify-content-between flex-wrap gap-2">
-
-              <div className="text-muted small">
-
-                {
-
-                  user
-
-                    ? hasVoted
-
-                      ? "Đã vote"
-
-                      : "Đang mở vote"
-
-                    : guestMode
-
-                      ? guestVoted
-
-                        ? "Thiết bị đã vote"
-
-                        : "Đang vote với tư cách khách"
-
-                      : "Vui lòng chọn hình thức bình chọn"
-
-                }
-
-              </div>
-
-              <div className="d-flex gap-2 flex-wrap">
-
-                {
-
-                  !user && !guestMode ? (
-
-                    <>
-
-<div className="login-stack">
-  <button
-    className="login-btn google"
-    onClick={loginGoogle}
-  >
-    <i className="bi bi-google"></i>
-    <span>Đăng nhập với Google</span>
-  </button>
-
-  <button
-    className="login-btn microsoft"
-    onClick={loginMicrosoft}
-  >
-    <i className="bi bi-microsoft"></i>
-    <span>Đăng nhập với Microsoft 365</span>
-  </button>
-
-  <div className="divider">
-    <span>hoặc</span>
-  </div>
-
-  <button
-    className="login-btn guest"
-    onClick={continueAsGuest}
-  >
-    <i className="bi bi-person-circle"></i>
-    <span>Vào với tư cách Khách</span>
-  </button>
+				.toLowerCase()
+
+				.includes(search.toLowerCase()) ||
+			(p.author || "")
+
+				.toLowerCase()
+
+				.includes(search.toLowerCase())
+	);
+
+	/* ====================================================== */
+	/* ====================== SECURITY ======================= */
+	/* ====================================================== */
+
+	useEffect(() => {
+		const blockKeys = (e) => {
+			if (e.key === "F12") {
+				e.preventDefault();
+			}
+
+			if (
+				(e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key)) ||
+				(e.ctrlKey && e.key === "U")
+			) {
+				e.preventDefault();
+			}
+		};
+
+		window.addEventListener(
+			"keydown",
+
+			blockKeys
+		);
+
+		return () => {
+			window.removeEventListener(
+				"keydown",
+
+				blockKeys
+			);
+		};
+	}, []);
+
+	useEffect(() => {
+		const blockContext = (e) => e.preventDefault();
+
+		document.addEventListener(
+			"contextmenu",
+
+			blockContext
+		);
+
+		return () => {
+			document.removeEventListener(
+				"contextmenu",
+
+				blockContext
+			);
+		};
+	}, []);
+
+	/* ====================================================== */
+	/* ========================== UI ========================= */
+	/* ====================================================== */
+	useEffect(() => {
+		console.log("guestMode:", guestMode);
+	}, [guestMode]);
+	return (
+		<div className="container-fluid bg-light min-vh-100 py-4">
+			{/* ====================================================== */}
+			{/* ======================== HEADER ======================= */}
+			{/* ====================================================== */}
+
+			<div className="container mb-4">
+				<div className="card shadow-sm border-0">
+					<div className="card-body">
+						<div className="d-flex align-items-center gap-3 mb-3">
+							<img
+								src="/logo.png"
+								style={{
+									width: 52,
+
+									height: 52,
+								}}
+							/>
+
+							<div>
+								<div className="text-muted small">
+									<h5>TRƯỜNG Y DƯỢC - ĐẠI HỌC ĐÀ NẴNG</h5>
+								</div>
+
+								<h6 className="fw-bold mb-0 text-primary">
+									{contest?.title || "Poster Voting System"}
+								</h6>
+							</div>
+						</div>
+
+						{/* ================= STATUS ================= */}
+
+						<div className="alert alert-info d-flex justify-content-between mb-3">
+							<div>🕒 {voteStatusText}</div>
+
+							<div>
+								{contest?.startTime && contest?.endTime && (
+									<>
+										{new Date(contest.startTime.toDate()).toLocaleString(
+											"vi-VN"
+										)}
+										→
+										{new Date(contest.endTime.toDate()).toLocaleString("vi-VN")}
+									</>
+								)}
+							</div>
+						</div>
+
+						{/* ================= LOGIN AREA ================= */}
+
+						<div className="d-flex justify-content-between flex-wrap gap-2">
+							<div className="text-muted small">
+								{user
+									? hasVoted
+										? "Đã vote"
+										: "Đang mở vote"
+									: guestMode
+									? guestVoted
+										? "Thiết bị đã vote"
+										: "Đang vote với tư cách khách"
+									: "Vui lòng chọn hình thức bình chọn"}
+							</div>
+
+							<div className="d-flex gap-2 flex-wrap">
+								{!user && !guestMode ? (
+									<>
+										<div className="login-stack">
+											<button
+												className="login-btn google"
+												onClick={loginGoogle}
+											>
+												<i className="bi bi-google"></i>
+												<span>Đăng nhập với Google</span>
+											</button>
+
+											<button
+												className="login-btn microsoft"
+												onClick={loginMicrosoft}
+											>
+												<i className="bi bi-microsoft"></i>
+												<span>Đăng nhập với Microsoft 365</span>
+											</button>
+
+											<div className="divider">
+												<span>hoặc</span>
+											</div>
+
+											<button
+												className="login-btn guest"
+												onClick={continueAsGuest}
+											>
+												<i className="bi bi-person-circle"></i>
+												<span>Vào với tư cách Khách</span>
+											</button>
+										</div>
+									</>
+								) : (
+									<>
+										{user && (
+											<>
+												<div className="small">{user.email}</div>
+
+												<button
+													className="btn btn-outline-dark btn-sm"
+													onClick={logoutUser}
+												>
+													Logout
+												</button>
+											</>
+										)}
+
+										{guestMode && (
+											<div className="badge bg-warning text-dark">
+												Guest Voting
+											</div>
+										)}
+									</>
+								)}
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* ====================================================== */}
+			{/* ======================== SEARCH ======================= */}
+			{/* ====================================================== */}
+
+			{(user || guestMode) && (
+				<div className="container mb-3">
+					<input
+						className="form-control"
+						value={search}
+						onChange={(e) => setSearch(e.target.value)}
+						placeholder="Tìm poster..."
+					/>
+				</div>
+			)}
+
+			{/* ====================================================== */}
+			{/* ===================== STATUS BAR ====================== */}
+			{/* ====================================================== */}
+
+			{(user || guestMode) && (
+				<div className="container mb-3">
+					<div className="alert alert-success d-flex justify-content-between">
+						<div>
+							Đã chọn <b>{selectedPosters.length}</b>/{getMaxVote()}
+							poster
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* ====================================================== */}
+			{/* ========================= GRID ======================== */}
+			{/* ====================================================== */}
+
+			<div className="container">
+				<div className="row g-4">
+					{filteredPosters.map((p) => {
+						const selected = selectedPosters.includes(p.id);
+
+						return (
+							<div key={p.id} className="col-xl-3 col-lg-4 col-md-6">
+								<div
+									className={`card h-100 shadow-sm border-0 position-relative ${
+										selected ? "border-success" : ""
+									}`}
+									onClick={() => {
+										if (!user && !guestMode) {
+											Swal.fire({
+												icon: "info",
+
+												title: "Chưa xác nhận hình thức bình chọn",
+
+												text: "Vui lòng đăng nhập hoặc tiếp tục với tư cách khách",
+											});
+
+											return;
+										}
+
+										togglePoster(p);
+									}}
+									style={{
+										cursor:
+											Boolean(user) || Boolean(guestMode)
+												? "pointer"
+												: "not-allowed",
+
+										opacity: Boolean(user) || Boolean(guestMode) ? 1 : 0.7,
+									}}
+								>
+									{/* ================= OVERLAY ================= */}
+
+									{!user && !guestMode ? (
+										<div className="guest-overlay">
+											<div>
+												Đăng nhập hoặc chọn Khách
+												<br />
+												để bình chọn
+											</div>
+										</div>
+									) : null}
+
+									<img
+										src={p.imageUrl}
+										className="card-img-top"
+										style={{
+											height: 240,
+
+											objectFit: "cover",
+										}}
+									/>
+
+									<div className="card-body text-center">
+										<h6 className="fw-bold">{p.title}</h6>
+
+										<small className="text-muted">{p.author}</small>
+
+										<div className="mt-3">
+											<div className="d-flex align-items-center justify-content-center gap-2 small text-muted">
+												{/* LOGIN */}
+												<div className="d-flex align-items-center gap-1">
+													<span style={{ fontSize: 18 }}>👤</span>
+
+													<span className="fw-semibold">
+														{p.voteCount || 0}
+													</span>
+												</div>
+
+												<span className="text-secondary fw-bold">+</span>
+
+												{/* GUEST */}
+												<div className="d-flex align-items-center gap-1">
+													<span style={{ fontSize: 18 }}>🕵️</span>
+
+													<span className="fw-semibold">
+														{p.guestVoteCount || 0}
+													</span>
+												</div>
+
+												<span className="text-secondary fw-bold">=</span>
+
+												{/* TOTAL */}
+												<div
+													className="px-3 py-1 rounded-pill fw-bold d-flex align-items-center gap-2"
+													style={{
+														background:
+															"linear-gradient(135deg,#ff4d6d,#ff758f)",
+														color: "#fff",
+														boxShadow: "0 4px 12px rgba(255,77,109,0.35)",
+														fontSize: 18,
+													}}
+												>
+													<span style={{ fontSize: 20 }}>❤️</span>
+
+													<span>
+														{(p.voteCount || 0) + (p.guestVoteCount || 0)}
+													</span>
+												</div>
+											</div>
+										</div>
+
+										{(Boolean(user) || Boolean(guestMode)) &&
+											!hasVoted &&
+											!guestVoted &&
+											nowAllowed && (
+												<button
+													className={`btn w-100 mt-2 ${
+														selected ? "btn-success" : "btn-outline-success"
+													}`}
+												>
+													{selected ? "Đã chọn" : "Chọn"}
+												</button>
+											)}
+
+										<div className="d-flex gap-2 mt-2">
+	<button
+		className="btn btn-outline-dark w-100"
+		onClick={(e) => {
+			e.stopPropagation();
+
+			setPreviewPoster(p);
+		}}
+	>
+		👁 Xem chi tiết
+	</button>
+
+	<button
+		className="btn btn-primary w-100"
+		onClick={(e) => {
+			e.stopPropagation();
+
+			shareFacebook(p);
+		}}
+	>
+		📤 Share
+	</button>
 </div>
-
-                    </>
-
-                  ) : (
-
-                    <>
-
-                      {
-
-                        user && (
-
-                          <>
-
-                            <div className="small">
-
-                              {user.email}
-
-                            </div>
-
-                            <button
-
-                              className="btn btn-outline-dark btn-sm"
-
-                              onClick={logoutUser}
-
-                            >
-
-                              Logout
-
-                            </button>
-
-                          </>
-
-                        )
-
-                      }
-
-                      {
-
-                        guestMode && (
-
-                          <div className="badge bg-warning text-dark">
-
-                            Guest Voting
-
-                          </div>
-
-                        )
-
-                      }
-
-                    </>
-
-                  )
-
-                }
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* ====================================================== */}
-      {/* ======================== SEARCH ======================= */}
-      {/* ====================================================== */}
-
-      {(user || guestMode) && (
-
-        <div className="container mb-3">
-
-          <input
-
-            className="form-control"
-
-            value={search}
-
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-
-            placeholder="Tìm poster..."
-
-          />
-
-        </div>
-
-      )}
-
-      {/* ====================================================== */}
-      {/* ===================== STATUS BAR ====================== */}
-      {/* ====================================================== */}
-
-      {(user || guestMode) && (
-
-        <div className="container mb-3">
-
-          <div className="alert alert-success d-flex justify-content-between">
-
-            <div>
-
-              Đã chọn
-
-              {" "}
-
-              <b>
-
-                {selectedPosters.length}
-
-              </b>
-
-              /
-
-              {getMaxVote()}
-
-              poster
-
-            </div>
-
-          </div>
-
-        </div>
-
-      )}
-
-      {/* ====================================================== */}
-      {/* ========================= GRID ======================== */}
-      {/* ====================================================== */}
-
-      <div className="container">
-
-        <div className="row g-4">
-
-          {filteredPosters.map((p) => {
-
-            const selected =
-              selectedPosters.includes(p.id);
-
-            return (
-
-              <div
-
-                key={p.id}
-
-                className="col-xl-3 col-lg-4 col-md-6"
-
-              >
-
-                <div
-
-                  className={`card h-100 shadow-sm border-0 position-relative ${
-                    selected
-                      ? "border-success"
-                      : ""
-                  }`}
-
-                  onClick={() => {
-
-                    if (!user && !guestMode) {
-
-                      Swal.fire({
-
-                        icon: "info",
-
-                        title:
-                          "Chưa xác nhận hình thức bình chọn",
-
-                        text:
-                          "Vui lòng đăng nhập hoặc tiếp tục với tư cách khách"
-
-                      });
-
-                      return;
-                    }
-
-                    togglePoster(p);
-
-                  }}
-
-                  style={{
-
-                    cursor:
-                      Boolean(user) || Boolean(guestMode)
-                        ? "pointer"
-                        : "not-allowed",
-
-                    opacity:
-                      Boolean(user) || Boolean(guestMode)
-                        ? 1
-                        : 0.7
-
-                  }}
-
-                >
-
-                  {/* ================= OVERLAY ================= */}
-
-                  {
-  !user && !guestMode ? (
-
-    <div className="guest-overlay">
-
-      <div>
-
-        Đăng nhập hoặc chọn Khách
-        <br />
-        để bình chọn
-
-      </div>
-
-    </div>
-
-  ) : null
-}
-
-                  <img
-
-                    src={p.imageUrl}
-
-                    className="card-img-top"
-
-                    style={{
-
-                      height: 240,
-
-                      objectFit: "cover"
-
-                    }}
-
-                  />
-
-                  <div className="card-body text-center">
-
-                    <h6 className="fw-bold">
-
-                      {p.title}
-
-                    </h6>
-
-                    <small className="text-muted">
-
-                      {p.author}
-
-                    </small>
-
-                    <div className="mt-3">
-
-  <div className="d-flex align-items-center justify-content-center gap-2 small text-muted">
-
-    {/* LOGIN */}
-    <div className="d-flex align-items-center gap-1">
-
-      <span style={{ fontSize: 18 }}>
-        👤
-      </span>
-
-      <span className="fw-semibold">
-
-        {p.voteCount || 0}
-
-      </span>
-
-    </div>
-
-    <span className="text-secondary fw-bold">
-      +
-    </span>
-
-    {/* GUEST */}
-    <div className="d-flex align-items-center gap-1">
-
-      <span style={{ fontSize: 18 }}>
-        🕵️
-      </span>
-
-      <span className="fw-semibold">
-
-        {p.guestVoteCount || 0}
-
-      </span>
-
-    </div>
-
-    <span className="text-secondary fw-bold">
-      =
-    </span>
-
-    {/* TOTAL */}
-    <div
-      className="px-3 py-1 rounded-pill fw-bold d-flex align-items-center gap-2"
-      style={{
-        background:
-          "linear-gradient(135deg,#ff4d6d,#ff758f)",
-        color: "#fff",
-        boxShadow:
-          "0 4px 12px rgba(255,77,109,0.35)",
-        fontSize: 18
-      }}
-    >
-
-      <span style={{ fontSize: 20 }}>
-        ❤️
-      </span>
-
-      <span>
-
-        {
-
-          (p.voteCount || 0) +
-
-          (p.guestVoteCount || 0)
-
-        }
-
-      </span>
-
-    </div>
-
-  </div>
-
-</div>
-
-                    {
-
-                      (Boolean(user) || Boolean(guestMode)) &&
-!hasVoted &&
-!guestVoted &&
-nowAllowed && (
-
-                        <button
-
-                          className={`btn w-100 mt-2 ${
-                            selected
-                              ? "btn-success"
-                              : "btn-outline-success"
-                          }`}
-
-                        >
-
-                          {
-
-                            selected
-                              ? "Đã chọn"
-                              : "Chọn"
-
-                          }
-
-                        </button>
-
-                      )
-
-                    }
-
-                    <button
-
-                      className="btn btn-primary w-100 mt-2"
-
-                      onClick={(e) => {
-
-                        e.stopPropagation();
-
-                        shareFacebook(p);
-
-                      }}
-
-                    >
-
-                      📤 Share
-
-                    </button>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            );
-
-          })}
-
-        </div>
-
-      </div>
-
-      {/* ====================================================== */}
-      {/* ====================== FLOAT BAR ====================== */}
-      {/* ====================================================== */}
-
-      {(user || guestMode) &&
-        !hasVoted &&
-        !guestVoted &&
-        selectedPosters.length > 0 && (
-
-        <div className="vote-bar shadow-lg">
-
-          <div className="container d-flex justify-content-between align-items-center">
-
-            <div>
-
-              Đã chọn
-
-              {" "}
-
-              <b>
-
-                {selectedPosters.length}
-
-              </b>
-
-              /
-
-              {getMaxVote()}
-
-              poster
-
-            </div>
-
-            <button
-
-              className="btn btn-primary"
-
-              disabled={
-                submitting ||
-                !nowAllowed
-              }
-
-              onClick={submitVote}
-
-            >
-
-              XÁC NHẬN VOTE
-
-            </button>
-
-          </div>
-
-        </div>
-
-      )}
-
-    </div>
-  );
-  
+									</div>
+								</div>
+							</div>
+						);
+					})}
+				</div>
+			</div>
+
+			{/* ====================================================== */}
+			{/* ====================== FLOAT BAR ====================== */}
+			{/* ====================================================== */}
+
+			{(user || guestMode) &&
+				!hasVoted &&
+				!guestVoted &&
+				selectedPosters.length > 0 && (
+					<div className="vote-bar shadow-lg">
+						<div className="container d-flex justify-content-between align-items-center">
+							<div>
+								Đã chọn <b>{selectedPosters.length}</b>/{getMaxVote()}
+								poster
+							</div>
+
+							<button
+								className="btn btn-primary"
+								disabled={submitting || !nowAllowed}
+								onClick={submitVote}
+							>
+								XÁC NHẬN VOTE
+							</button>
+						</div>
+					</div>
+				)}
+				{/* ====================================================== */}
+{/* ===================== PREVIEW MODAL =================== */}
+{/* ====================================================== */}
+
+{previewPoster && (
+	<div
+		className="modal fade show"
+		style={{
+			display: "block",
+			background: "rgba(0,0,0,0.7)",
+			zIndex: 9999,
+		}}
+		onClick={() => setPreviewPoster(null)}
+	>
+		<div
+			className="modal-dialog modal-xl modal-dialog-centered"
+			onClick={(e) => e.stopPropagation()}
+		>
+			<div className="modal-content border-0 shadow-lg">
+				<div className="modal-header">
+					<div>
+						<h5 className="modal-title fw-bold">
+							{previewPoster.title}
+						</h5>
+
+						<div className="text-muted small">
+							{previewPoster.author}
+						</div>
+					</div>
+
+					<button
+						className="btn-close"
+						onClick={() => setPreviewPoster(null)}
+					></button>
+				</div>
+
+				<div
+					className="modal-body text-center bg-dark"
+					style={{
+						maxHeight: "85vh",
+						overflow: "auto",
+					}}
+				>
+					<img
+						src={previewPoster.imageUrl}
+						alt={previewPoster.title}
+						style={{
+							width: "100%",
+							height: "auto",
+							borderRadius: 12,
+						}}
+					/>
+				</div>
+
+				<div className="modal-footer">
+					<div className="me-auto small text-muted">
+						👤 {previewPoster.voteCount || 0}
+						&nbsp;&nbsp;+&nbsp;&nbsp;
+						🕵️ {previewPoster.guestVoteCount || 0}
+						&nbsp;&nbsp;=&nbsp;&nbsp;
+						❤️{" "}
+						{(previewPoster.voteCount || 0) +
+							(previewPoster.guestVoteCount || 0)}
+					</div>
+
+					<button
+						className="btn btn-secondary"
+						onClick={() => setPreviewPoster(null)}
+					>
+						Đóng
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+)}
+		</div>
+	);
 }
