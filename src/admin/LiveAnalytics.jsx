@@ -1,117 +1,134 @@
 import { useEffect, useState } from "react";
 import { db } from "../firebase/firebase";
-import {
-  collection,
-  onSnapshot
-} from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 
 export default function LiveAnalytics() {
-
   const [posters, setPosters] = useState([]);
   const [votes, setVotes] = useState([]);
 
-  /* ================= REALTIME POSTERS ================= */
-
+  /* ================= REALTIME ================= */
   useEffect(() => {
-
-    const unsubPosters = onSnapshot(
-      collection(db, "posters"),
-      snap => {
-        const data = snap.docs.map(d => ({
+    const unsubPosters = onSnapshot(collection(db, "posters"), (snap) => {
+      setPosters(
+        snap.docs.map((d) => ({
           id: d.id,
-          ...d.data()
-        }));
-        setPosters(data);
-      }
-    );
+          ...d.data(),
+        }))
+      );
+    });
 
-    const unsubVotes = onSnapshot(
-      collection(db, "votes"),
-      snap => {
-        const data = snap.docs.map(d => ({
+    const unsubVotes = onSnapshot(collection(db, "votes"), (snap) => {
+      setVotes(
+        snap.docs.map((d) => ({
           id: d.id,
-          ...d.data()
-        }));
-        setVotes(data);
-      }
-    );
+          ...d.data(),
+        }))
+      );
+    });
 
     return () => {
       unsubPosters();
       unsubVotes();
     };
-
   }, []);
 
-  /* ================= CALCULATE ================= */
+  /* ================= ANALYTICS ================= */
 
   const totalVotes = votes.length;
+  const loginVotes = votes.filter((v) => v.type === "login").length;
+  const guestVotes = votes.filter((v) => v.type === "guest").length;
 
   const voteMap = {};
 
-  votes.forEach(v => {
-    voteMap[v.posterId] =
-      (voteMap[v.posterId] || 0) + 1;
+  votes.forEach((v) => {
+    if (!voteMap[v.posterId]) {
+      voteMap[v.posterId] = {
+        total: 0,
+        login: 0,
+        guest: 0,
+      };
+    }
+
+    voteMap[v.posterId].total += 1;
+
+    if (v.type === "login") voteMap[v.posterId].login += 1;
+    if (v.type === "guest") voteMap[v.posterId].guest += 1;
   });
 
   const leaderboard = posters
-    .map(p => ({
+    .map((p) => ({
       ...p,
-      voteCount: voteMap[p.id] || 0
+      voteCount: voteMap[p.id]?.total || 0,
+      loginVotes: voteMap[p.id]?.login || 0,
+      guestVotes: voteMap[p.id]?.guest || 0,
     }))
     .sort((a, b) => b.voteCount - a.voteCount);
+
+  const topPoster = leaderboard[0];
 
   /* ================= UI ================= */
 
   return (
-    <div className="container-fluid py-4">
+    <div className="admin-dashboard container-fluid py-4">
 
-      <h2 className="fw-bold mb-4">
-        📊 Live Voting Analytics
-      </h2>
+      {/* HEADER */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 className="fw-bold mb-1">📊 Live Voting Analytics</h2>
+          <div className="text-muted small">
+            Realtime Firestore Dashboard
+          </div>
+        </div>
 
-      {/* ================= STATS ================= */}
+        <div className="badge bg-dark px-3 py-2">
+          LIVE 🔴
+        </div>
+      </div>
 
-      <div className="row mb-4">
+      {/* KPI */}
+      <div className="row g-3 mb-4">
 
-        <div className="col-md-4 mb-3">
-          <div className="card shadow text-center">
-            <div className="card-body">
-              <h5>Tổng Poster</h5>
-              <h2>{posters.length}</h2>
+        <div className="col-md-3">
+          <div className="kpi-card posters">
+            <div className="kpi-title">Poster</div>
+            <div className="kpi-value">{posters.length}</div>
+          </div>
+        </div>
+
+        <div className="col-md-3">
+          <div className="kpi-card votes">
+            <div className="kpi-title">Tổng Vote</div>
+            <div className="kpi-value">{totalVotes}</div>
+            <div className="kpi-sub">
+              👤 {loginVotes} • 👥 {guestVotes}
             </div>
           </div>
         </div>
 
-        <div className="col-md-4 mb-3">
-          <div className="card shadow text-center">
-            <div className="card-body">
-              <h5>Tổng Vote</h5>
-              <h2 className="text-success">
-                {totalVotes}
-              </h2>
+        <div className="col-md-3">
+          <div className="kpi-card leader">
+            <div className="kpi-title">Dẫn đầu</div>
+            <div className="kpi-value-sm">
+              {topPoster?.title || "-"}
             </div>
           </div>
         </div>
 
-        <div className="col-md-4 mb-3">
-          <div className="card shadow text-center">
-            <div className="card-body">
-              <h5>Poster dẫn đầu</h5>
-              <h6>
-                {leaderboard[0]?.title || "-"}
-              </h6>
+        <div className="col-md-3">
+          <div className="kpi-card guest-highlight">
+            <div className="kpi-title">Guest Ratio</div>
+            <div className="kpi-value">
+              {totalVotes ? Math.round((guestVotes / totalVotes) * 100) : 0}%
             </div>
           </div>
         </div>
 
       </div>
 
-      {/* ================= LEADERBOARD ================= */}
+      {/* LEADERBOARD */}
+      <div className="leaderboard-card">
 
-      <div className="card shadow">
-
-        <div className="card-header bg-dark text-white">
+        <div className="leaderboard-header">
           🏆 Leaderboard
         </div>
 
@@ -121,55 +138,57 @@ export default function LiveAnalytics() {
 
             <thead className="table-light">
               <tr>
-                <th>#</th>
+                <th>Rank</th>
                 <th>Poster</th>
                 <th>Tác giả</th>
-                <th>Vote</th>
+                <th>Total</th>
+                <th>Login</th>
+                <th>Guest</th>
               </tr>
             </thead>
 
             <tbody>
 
               {leaderboard.map((p, index) => (
+                <tr key={p.id} className={index === 0 ? "top-1" : ""}>
 
-                <tr key={p.id}>
-
-                  <td>
+                  <td className="rank">
                     {index === 0 && "🥇"}
                     {index === 1 && "🥈"}
                     {index === 2 && "🥉"}
-                    {index > 2 && index + 1}
+                    {index > 2 && `#${index + 1}`}
                   </td>
 
-                  <td className="d-flex align-items-center gap-3">
-
+                  <td className="poster-cell">
                     {p.imageUrl && (
-                      <img
-                        src={p.imageUrl}
-                        alt=""
-                        style={{
-                          width: 60,
-                          height: 60,
-                          objectFit: "cover",
-                          borderRadius: 8
-                        }}
-                      />
+                      <img src={p.imageUrl} alt="" />
                     )}
-
-                    <b>{p.title}</b>
-
+                    <div className="poster-title">
+                      {p.title}
+                    </div>
                   </td>
 
-                  <td>{p.author}</td>
+                  <td className="text-muted">{p.author}</td>
 
                   <td>
-                    <span className="badge bg-success fs-6">
+                    <span className="vote-badge total">
                       {p.voteCount}
                     </span>
                   </td>
 
-                </tr>
+                  <td>
+                    <span className="vote-badge login">
+                      {p.loginVotes}
+                    </span>
+                  </td>
 
+                  <td>
+                    <span className="vote-badge guest">
+                      {p.guestVotes}
+                    </span>
+                  </td>
+
+                </tr>
               ))}
 
             </tbody>
@@ -179,6 +198,122 @@ export default function LiveAnalytics() {
         </div>
 
       </div>
+
+      {/* STYLE */}
+      <style>{`
+        .admin-dashboard {
+          background: #f8fafc;
+          min-height: 100vh;
+        }
+
+        /* KPI */
+        .kpi-card {
+          background: white;
+          border-radius: 16px;
+          padding: 18px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+          transition: 0.25s ease;
+        }
+
+        .kpi-card:hover {
+          transform: translateY(-3px);
+        }
+
+        .kpi-title {
+          font-size: 13px;
+          color: #64748b;
+        }
+
+        .kpi-value {
+          font-size: 28px;
+          font-weight: 800;
+          margin-top: 6px;
+        }
+
+        .kpi-value-sm {
+          font-size: 16px;
+          font-weight: 600;
+          margin-top: 10px;
+        }
+
+        .kpi-sub {
+          font-size: 12px;
+          color: #94a3b8;
+          margin-top: 4px;
+        }
+
+        .kpi-card.posters { border-left: 4px solid #6366f1; }
+        .kpi-card.votes { border-left: 4px solid #22c55e; }
+        .kpi-card.leader { border-left: 4px solid #f59e0b; }
+        .kpi-card.guest-highlight { border-left: 4px solid #16a34a; }
+
+        /* LEADERBOARD */
+        .leaderboard-card {
+          background: white;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+        }
+
+        .leaderboard-header {
+          padding: 14px 18px;
+          background: linear-gradient(135deg, #111827, #1f2937);
+          color: white;
+          font-weight: 600;
+        }
+
+        .table-hover tbody tr:hover {
+          background: #f8fafc;
+        }
+
+        .top-1 {
+          background: linear-gradient(90deg, rgba(34,197,94,0.08), transparent);
+        }
+
+        .rank {
+          font-weight: 700;
+          font-size: 16px;
+        }
+
+        .poster-cell {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .poster-cell img {
+          width: 48px;
+          height: 48px;
+          border-radius: 10px;
+          object-fit: cover;
+        }
+
+        .poster-title {
+          font-weight: 600;
+        }
+
+        .vote-badge {
+          padding: 6px 10px;
+          border-radius: 999px;
+          font-weight: 700;
+          font-size: 13px;
+        }
+
+        .vote-badge.total {
+          background: #0f172a;
+          color: white;
+        }
+
+        .vote-badge.login {
+          background: #2563eb;
+          color: white;
+        }
+
+        .vote-badge.guest {
+          background: #16a34a;
+          color: white;
+        }
+      `}</style>
 
     </div>
   );
